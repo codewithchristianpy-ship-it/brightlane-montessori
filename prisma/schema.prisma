@@ -1,0 +1,288 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  avatar    String?
+  bio       String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts           Post[]
+  threads         Thread[]
+  messages        Message[]
+  meetingRequests MeetingRequest[]
+  admissions      AdmissionApplication[]
+
+  @@index([role])
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  PARENT
+}
+
+model Student {
+  id        String   @id @default(cuid())
+  name      String
+  dateOfBirth DateTime
+  parentName String
+  parentEmail String
+  parentPhone String
+  address   String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classId   String
+  classroom ClassRoom @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+}
+
+model ClassRoom {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  level     Int
+  capacity  Int       @default(20)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students       Student[]
+  subjects       Subject[]
+  timetables     TimetableEntry[]
+  decks          Deck[]
+  posts          Post[]
+  threads        Thread[]
+  announcements  Announcement[]
+
+  @@index([slug])
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  icon      String   // lucide icon name
+  color     String   @default("#2E9DF7")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classId   String
+  classroom ClassRoom @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  timetables TimetableEntry[]
+
+  @@unique([classId, slug])
+  @@index([classId])
+}
+
+model TimetableEntry {
+  id        String   @id @default(cuid())
+  dayOfWeek Int      // 0=Mon, 1=Tue, ..., 4=Fri
+  period    Int      // 1-7
+  startTime String   // HH:mm
+  endTime   String   // HH:mm
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classId   String
+  classroom ClassRoom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, dayOfWeek, period])
+  @@index([classId])
+  @@index([subjectId])
+}
+
+model Deck {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String
+  description String?
+  icon      String   // lucide icon name
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classId   String
+  classroom ClassRoom @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  flashcards Flashcard[]
+
+  @@unique([classId, slug])
+  @@index([classId])
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  front     String
+  back      String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deckId    String
+  deck      Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classId   String?
+  classroom ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@index([isPinned])
+  @@index([classId])
+  @@index([createdAt])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String
+  content   String
+  excerpt   String?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  classId   String?
+  classroom ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@unique([slug])
+  @@index([slug])
+  @@index([authorId])
+  @@index([publishedAt])
+  @@index([classId])
+}
+
+model Thread {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  classId   String?
+  classroom ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  messages        Message[]
+  meetingRequests MeetingRequest[]
+
+  @@unique([slug])
+  @@index([slug])
+  @@index([authorId])
+  @@index([classId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  threadId  String
+  thread    Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([threadId])
+  @@index([createdAt])
+}
+
+model MeetingRequest {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  scheduledAt DateTime
+  status    MeetingStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  threadId  String?
+  thread    Thread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+enum MeetingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model AdmissionApplication {
+  id        String   @id @default(cuid())
+  studentName String
+  parentName  String
+  email       String
+  phone       String
+  address     String?
+  message     String?
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId  String
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  ACCEPTED
+  REJECTED
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
